@@ -103,11 +103,13 @@ Compile coffeescript files to javascript files.
 
 ## Goal:watch
 
-    mvn coffeescript:watch
+    mvn coffeescript:watch OR mvn coffeescript:watch-mac
 
 ### Description:
 
 Compile coffeescript files to javascript files, and recompile as soon as a change occurs.
+
+Note: the 'watch-mac' goal uses a drop-in replacement for the Java 7 WatchService because the official OSX WatchService implementation is broken.
 
 ### Attributes:
 
@@ -125,6 +127,9 @@ Compile coffeescript files to javascript files, and recompile as soon as a chang
 # License
 
 [The Apache Software License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0.txt).
+
+This plugin includes code from https://code.google.com/p/barbarywatchservice which is licensed under the Lesser GPL.
+See https://code.google.com/p/barbarywatchservice/ for details.
 
 # Acknowledgement
 
