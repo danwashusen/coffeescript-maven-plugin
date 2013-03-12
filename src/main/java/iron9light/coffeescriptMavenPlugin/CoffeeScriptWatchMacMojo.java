@@ -9,12 +9,12 @@ import org.apache.maven.plugin.MojoFailureException;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
-import java.nio.file.attribute.BasicFileAttributes;
-//import java.nio.file.*;
-//import java.nio.file.attribute.BasicFileAttributes;
 
 /**
  * Compile coffeescript files to javascript files, and recompile as soon as a change occurs.
+ * This version of the watch plugin uses com.barbarysoftware.watchservice.WatchService to watch
+ * for file changes because the 'official' Oracle release of the Mac runtime uses polling instead of
+ * hooking into Apple's file system events system.
  *
  * @author iron9light
  * @goal watch-mac
@@ -55,12 +55,8 @@ public class CoffeeScriptWatchMacMojo extends CoffeeScriptMojoBase {
                 getLog().debug(String.format("watched %s - %s", event.kind().name(), file));
                 if (file.isDirectory()) {
                     getLog().debug("is directory");
-                    if (event.kind().name().equals(StandardWatchEventKinds.ENTRY_CREATE.name())) {
-                        // watch created folder.
-                        WatchableFile watchableFile = new WatchableFile(file);
-                        watchableFile.register(watchService, watchEvents);
-                        getLog().debug(String.format("watch %s", file));
-                    }
+                    // don't need to add a watch for the dir, it's already covered by it's ancestor watch
+                    // adding another causes the same file to be compiled several times (one for each sub-directory form it's ancestor)
                     continue;
                 }
 
@@ -90,16 +86,9 @@ public class CoffeeScriptWatchMacMojo extends CoffeeScriptMojoBase {
 
     private WatchService startWatching(Path sourceDirectory) throws IOException {
         final WatchService watchService = WatchService.newWatchService();
-
-        Files.walkFileTree(sourceDirectory, new SimpleFileVisitor<Path>() {
-            @Override
-            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-                WatchableFile watchableFile = new WatchableFile(dir.toFile());
-                watchableFile.register(watchService, watchEvents);
-                getLog().debug(String.format("watch %s", dir));
-                return FileVisitResult.CONTINUE;
-            }
-        });
+        WatchableFile watchableFile = new WatchableFile(sourceDirectory.toFile());
+        watchableFile.register(watchService, watchEvents);
+        getLog().debug(String.format("watch %s", sourceDirectory.toString()));
         return watchService;
     }
 }
