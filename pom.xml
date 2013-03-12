@@ -3,7 +3,7 @@
   <groupId>com.github.iron9light</groupId>
   <artifactId>coffeescript-maven-plugin</artifactId>
   <packaging>maven-plugin</packaging>
-  <version>1.2-SNAPSHOT</version>
+  <version>1.2-SD</version>
   <name>Coffeescript Maven Plugin</name>
   <description>A Maven plugin for compiling coffeescript into javascript</description>
   <inceptionYear>2011</inceptionYear>
@@ -44,15 +44,16 @@
   </properties>
 
   <distributionManagement>
+    <!-- Publish versioned releases here -->
     <repository>
-      <id>sonatype-nexus-staging</id>
-      <name>oss.sonatype.org Staging Repository</name>
-      <url>https://oss.sonatype.org/service/local/staging/deploy/maven2</url>
-    </repository>
-    <snapshotRepository>
-      <id>sonatype-nexus-snapshots</id>
-      <name>oss.sonatype.org github Release Repository Snapshot Repository</name>
-      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+    <id>nexus.sixtydigits.com</id>
+    <url>http://nexus.sixtydigits.com/nexus/content/repositories/releases</url>
+  </repository>
+
+  <!-- Publish snapshots here -->
+  <snapshotRepository>
+    <id>nexus.sixtydigits.com</id>
+    <url>http://nexus.sixtydigits.com/nexus/content/repositories/snapshots</url>
     </snapshotRepository>
   </distributionManagement>
 
