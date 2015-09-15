@@ -14,6 +14,10 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Vector;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public abstract class CoffeeScriptMojoBase extends AbstractMojo {
     /**
@@ -59,6 +63,15 @@ public abstract class CoffeeScriptMojoBase extends AbstractMojo {
 
     private static URL defaultCoffeeScriptUrl = CoffeeScriptMojoBase.class.getResource("/coffee-script.js");
 
+    private final ThreadLocal<CoffeeScriptCompiler> compilerThreadLocal = new ThreadLocal<CoffeeScriptCompiler>() {
+        @Override
+        protected CoffeeScriptCompiler initialValue() {
+            CoffeeScriptCompiler compiler = new CoffeeScriptCompiler(getCoffeeScriptUrl(), bare);
+            getLog().info(String.format("Coffeescript version: %s", compiler.version));
+            return compiler;
+        }
+    };
+
     public void execute() throws MojoExecutionException, MojoFailureException {
         CoffeeScriptCompiler compiler = new CoffeeScriptCompiler(getCoffeeScriptUrl(), bare);
         getLog().info(String.format("Coffeescript version: %s", compiler.version));
@@ -81,17 +94,37 @@ public abstract class CoffeeScriptMojoBase extends AbstractMojo {
 
     abstract protected void doExecute(CoffeeScriptCompiler compiler, Path sourceDirectory, Path outputDirectory) throws Exception;
 
-    protected void compileCoffeeFilesInDir(final CoffeeScriptCompiler compiler, final Path sourceDirectory, final Path outputDirectory) throws IOException, MojoFailureException {
+    protected void compileCoffeeFilesInDir(final CoffeeScriptCompiler compiler, final Path sourceDirectory, final Path outputDirectory) throws IOException, MojoFailureException, InterruptedException {
+        final int workers = Math.max(2, Runtime.getRuntime().availableProcessors() - 1);
+        ExecutorService executorService = Executors.newFixedThreadPool(workers);
+        getLog().info(String.format("Compiling with %d workers", workers));
         long startTime = System.currentTimeMillis();
         List<Path> coffeeFiles = findCoffeeFilesInDir(sourceDirectory);
-        List<String> failedFileNames = new ArrayList<>();
-        for (Path coffeeFile : coffeeFiles) {
-            String coffeeFileName = sourceDirectory.relativize(coffeeFile).toString();
-            String jsFileName = getJsFileName(coffeeFileName);
-            Path jsFile = outputDirectory.resolve(jsFileName);
-            if (!compileCoffeeFile(compiler, coffeeFile, jsFile, coffeeFileName, jsFileName)) {
-                failedFileNames.add(coffeeFileName);
-            }
+        final List<String> failedFileNames = new Vector<>();
+        for (final Path coffeeFile : coffeeFiles) {
+            final String coffeeFileName = sourceDirectory.relativize(coffeeFile).toString();
+            final String jsFileName = getJsFileName(coffeeFileName);
+            final Path jsFile = outputDirectory.resolve(jsFileName);
+            executorService.submit(new Runnable() {
+                @Override
+                public void run() {
+                    CoffeeScriptCompiler compiler = compilerThreadLocal.get();
+                    try {
+                        getLog().info(String.format("Compiling '%s' to '%s'", coffeeFile, jsFile));
+                        if (!compileCoffeeFile(compiler, coffeeFile, jsFile, coffeeFileName, jsFileName)) {
+                            failedFileNames.add(coffeeFileName);
+                        }
+                    } catch (Exception e) {
+                        failedFileNames.add(coffeeFileName);
+                        getLog().error(String.format("Exception thrown while compiling '%s'", coffeeFileName), e);
+                    }
+                }
+            });
+        }
+
+        executorService.shutdown();
+        while (!executorService.awaitTermination(1, TimeUnit.MINUTES)) {
+            getLog().info(String.format("Waiting for compilation to complete..."));
         }
 
         long escapedTime = System.currentTimeMillis() - startTime;
